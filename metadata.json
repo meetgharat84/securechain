@@ -1,0 +1,6 @@
+{
+  "name": "SecurePatch AI",
+  "description": "Deterministic smart contract security and verified automated patching platform for Solidity protocols.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
