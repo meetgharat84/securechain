@@ -1,6 +1,8 @@
 import React from 'react';
 import type { AppScreen } from '../types';
-import { SHIELD_LOGO_URL, AVATAR_URL } from '../data/mockData';
+import type { UserDoc } from '../server/models';
+import { SHIELD_LOGO_URL } from '../data/mockData';
+import { getUserInitials, AuthService } from '../services/authService';
 
 interface SidebarProps {
   currentScreen: AppScreen;
@@ -8,6 +10,7 @@ interface SidebarProps {
   activeTarget: string;
   onSelectTarget: (target: string) => void;
   onOpenNewScan: () => void;
+  currentUser?: UserDoc | null;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -15,7 +18,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNavigate,
   activeTarget,
   onSelectTarget,
-  onOpenNewScan
+  onOpenNewScan,
+  currentUser
 }) => {
   const navItems = [
     { id: 'overview', label: 'Overview', icon: 'dashboard' },
@@ -120,17 +124,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className="flex items-center gap-space-xs pt-space-xs border-t border-[#e9e8e5] cursor-pointer hover:bg-[#efeeeb] p-1.5 rounded-lg transition-colors"
           title="Manage Auditor Profile & Workspace"
         >
-          <img
-            alt="Profile"
-            className="w-8 h-8 rounded-full object-cover border border-[#c5c6ca]"
-            src={AVATAR_URL}
-          />
+          {currentUser?.avatar ? (
+            <img
+              alt="Profile"
+              className="w-8 h-8 rounded-full object-cover border border-[#c5c6ca]"
+              src={currentUser.avatar}
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-[#37675d] text-[#ffffff] font-semibold text-xs flex items-center justify-center border border-[#c5c6ca] shrink-0 select-none">
+              {getUserInitials(currentUser?.name, currentUser?.email)}
+            </div>
+          )}
           <div className="flex flex-col truncate">
             <span className="font-body-sm text-body-sm font-medium text-[#1b1c1a] truncate">
-              Lead Protocol Auditor
+              {currentUser?.name || AuthService.deriveNameFromEmail(currentUser?.email || '')}
             </span>
             <span className="font-code-sm text-code-sm text-[#44474a] truncate">
-              sec@securechain.ai
+              {currentUser?.email || 'No active account'}
             </span>
           </div>
         </div>

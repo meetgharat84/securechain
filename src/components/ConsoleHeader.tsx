@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import type { AppScreen } from '../types';
-import { AVATAR_URL } from '../data/mockData';
+import type { UserDoc } from '../server/models';
 import { ProfileMenu } from './ProfileMenu';
+import { getUserInitials, AuthService } from '../services/authService';
 
 interface ConsoleHeaderProps {
   currentScreen: AppScreen;
@@ -10,6 +11,7 @@ interface ConsoleHeaderProps {
   onOpenCommandPalette: () => void;
   onOpenNewScan: () => void;
   onNavigate: (screen: AppScreen) => void;
+  currentUser?: UserDoc | null;
 }
 
 export const ConsoleHeader: React.FC<ConsoleHeaderProps> = ({
@@ -18,7 +20,8 @@ export const ConsoleHeader: React.FC<ConsoleHeaderProps> = ({
   onSelectTarget,
   onOpenCommandPalette,
   onOpenNewScan,
-  onNavigate
+  onNavigate,
+  currentUser
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -140,11 +143,17 @@ export const ConsoleHeader: React.FC<ConsoleHeaderProps> = ({
             className="flex items-center rounded-full transition-transform active:scale-95 cursor-pointer focus:outline-none"
             title="Open Profile Menu"
           >
-            <img
-              alt="Profile"
-              className="w-8 h-8 rounded-full object-cover border border-[#c5c6ca] hover:border-[#37675d] transition-colors"
-              src={AVATAR_URL}
-            />
+            {currentUser?.avatar ? (
+              <img
+                alt="Profile"
+                className="w-8 h-8 rounded-full object-cover border border-[#c5c6ca] hover:border-[#37675d] transition-colors"
+                src={currentUser.avatar}
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-[#37675d] text-[#ffffff] font-semibold text-xs flex items-center justify-center border border-[#c5c6ca] hover:border-[#37675d] transition-colors select-none">
+                {getUserInitials(currentUser?.name, currentUser?.email)}
+              </div>
+            )}
           </button>
 
           <ProfileMenu
@@ -152,8 +161,9 @@ export const ConsoleHeader: React.FC<ConsoleHeaderProps> = ({
             onClose={() => setProfileMenuOpen(false)}
             onNavigate={onNavigate}
             onOpenCommandPalette={onOpenCommandPalette}
-            userName="Lead Protocol Auditor"
-            userEmail="sec@securechain.ai"
+            userName={currentUser?.name || AuthService.deriveNameFromEmail(currentUser?.email || '')}
+            userEmail={currentUser?.email || ''}
+            userAvatar={currentUser?.avatar}
             workspaceName={activeTarget}
           />
         </div>

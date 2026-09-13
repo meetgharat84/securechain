@@ -1,21 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import type { AppScreen } from '../types';
-import { AVATAR_URL } from '../data/mockData';
 import { ApiService } from '../server/api';
 import type { UserDoc, WorkspaceDoc } from '../server/models';
+import { getUserInitials, AuthService } from '../services/authService';
 
 interface ProfileViewProps {
-  onNavigate: (screen: AppScreen) => void;
+  onNavigate: (screen: AppScreen, urlPath?: string) => void;
   onShowToast: (msg: string) => void;
+  currentUser?: UserDoc | null;
+  onUserUpdated?: (user: UserDoc) => void;
 }
 
-export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigate, onShowToast }) => {
+export const ProfileView: React.FC<ProfileViewProps> = ({
+  onNavigate,
+  onShowToast,
+  currentUser,
+  onUserUpdated,
+}) => {
   const [activeTab, setActiveTab] = useState<'personal' | 'workspace' | 'security' | 'danger'>('personal');
   
-  // Personal Info State
-  const [name, setName] = useState('Lead Protocol Auditor');
-  const [email, setEmail] = useState('sec@securechain.ai');
-  const [role, setRole] = useState('Principal Security Architect');
+  const [isLoadingUser, setIsLoadingUser] = useState(!currentUser);
+  const [userLoadError, setUserLoadError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Personal Info State — initialized from currentUser or empty, never hardcoded demo values
+  const [name, setName] = useState(currentUser?.name || '');
+  const [email, setEmail] = useState(currentUser?.email || '');
+  const [role, setRole] = useState(currentUser?.role || '');
+  const [avatar, setAvatar] = useState(currentUser?.avatar || '');
 
   // Workspace State
   const [workspaceName, setWorkspaceName] = useState('Treasury Protocols');
@@ -30,33 +42,88 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigate, onShowToas
   const [analyzerLogs, setAnalyzerLogs] = useState(true);
   const [notifications, setNotifications] = useState(true);
 
-  // Load existing data
+  // Load profile and workspace data
   useEffect(() => {
-    ApiService.getCurrentUser().then((u: UserDoc) => {
-      setName(u.name);
-      setEmail(u.email);
-      setRole(u.role);
-    }).catch(() => {});
+    let isCancelled = false;
 
-    ApiService.getWorkspace().then((w: WorkspaceDoc) => {
-      setWorkspaceName(w.name);
-      setPrivacy(w.privacy);
-      setRetentionDays(w.retentionDays);
-      setCompilerVersion(w.defaultCompilerVersion);
-      setAnalysisProfile(w.defaultAnalysisProfile);
-      setRequireVerification(w.securityPreferences.requireVerificationBeforeCompletion);
-      setBeginnerFriendly(w.securityPreferences.beginnerFriendlyExplanations);
-      setAnalyzerLogs(w.securityPreferences.analyzerLogs);
-      setNotifications(w.securityPreferences.notifications);
-    }).catch(() => {});
-  }, []);
+    ApiService.getCurrentUser()
+      .then((u) => {
+        if (isCancelled) return;
+        setName(u.name || AuthService.deriveNameFromEmail(u.email));
+        setEmail(u.email);
+        setRole(u.role || 'Smart Contract Security Auditor');
+        setAvatar(u.avatar || '');
+        setUserLoadError(null);
+        setIsLoadingUser(false);
+        onUserUpdated?.(u);
+      })
+      .catch((err: unknown) => {
+        if (isCancelled) return;
+        const msg = err instanceof Error ? err.message : 'Failed to load user profile';
+        setUserLoadError(msg);
+        setIsLoadingUser(false);
+        if (!AuthService.isAuthenticated()) {
+          onNavigate('login', '/login');
+        }
+      });
+
+    ApiService.getWorkspace()
+      .then((w: WorkspaceDoc) => {
+        if (isCancelled) return;
+        setWorkspaceName(w.name);
+        setPrivacy(w.privacy);
+        setRetentionDays(w.retentionDays);
+        setCompilerVersion(w.defaultCompilerVersion);
+        setAnalysisProfile(w.defaultAnalysisProfile);
+        setRequireVerification(w.securityPreferences.requireVerificationBeforeCompletion);
+        setBeginnerFriendly(w.securityPreferences.beginnerFriendlyExplanations);
+        setAnalyzerLogs(w.securityPreferences.analyzerLogs);
+        setNotifications(w.securityPreferences.notifications);
+      })
+      .catch(() => {});
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [onNavigate, onUserUpdated]);
+
+  const handleRetry = () => {
+    setIsLoadingUser(true);
+    setUserLoadError(null);
+    ApiService.getCurrentUser()
+      .then((u) => {
+        setName(u.name || AuthService.deriveNameFromEmail(u.email));
+        setEmail(u.email);
+        setRole(u.role || 'Smart Contract Security Auditor');
+        setAvatar(u.avatar || '');
+        setUserLoadError(null);
+        setIsLoadingUser(false);
+        onUserUpdated?.(u);
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : 'Failed to load user profile';
+        setUserLoadError(msg);
+        setIsLoadingUser(false);
+      });
+  };
 
   const handleSavePersonal = async () => {
+    if (!name.trim()) {
+      onShowToast('Please enter your full name.');
+      return;
+    }
+    setIsSaving(true);
     try {
-      await ApiService.updateProfile({ name, email, role });
+      const updated = await ApiService.updateProfile({ name: name.trim(), email, role });
+      setName(updated.name);
+      setRole(updated.role);
+      onUserUpdated?.(updated);
       onShowToast('Personal profile changes saved successfully.');
-    } catch {
-      onShowToast('Failed to save profile changes.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to save profile changes.';
+      onShowToast(msg);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -191,66 +258,113 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigate, onShowToas
         {/* TAB 1: PERSONAL INFORMATION */}
         {activeTab === 'personal' && (
           <div className="space-y-space-md max-w-xl">
-            <div className="flex items-center gap-space-md">
-              <img
-                src={AVATAR_URL}
-                alt="Profile Avatar"
-                className="w-16 h-16 rounded-full object-cover border-2 border-[#e9e8e5] shadow-xs"
-              />
-              <div className="space-y-1">
-                <span className="font-headline-sm text-sm font-semibold text-[#1b1c1a] block">
-                  Auditor Avatar
-                </span>
-                <span className="text-xs text-[#75777a] block">
-                  Managed via team authentication profile.
-                </span>
+            {isLoadingUser && !email ? (
+              <div className="p-8 space-y-4 animate-pulse">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-[#e9e8e5]"></div>
+                  <div className="space-y-2">
+                    <div className="h-4 w-32 bg-[#e9e8e5] rounded"></div>
+                    <div className="h-3 w-48 bg-[#e9e8e5] rounded"></div>
+                  </div>
+                </div>
+                <div className="h-10 bg-[#e9e8e5] rounded"></div>
+                <div className="h-10 bg-[#e9e8e5] rounded"></div>
               </div>
-            </div>
+            ) : userLoadError && !email ? (
+              <div className="p-4 rounded-lg bg-[#ffdad6]/30 border border-[#ba1a1a]/30 text-xs text-[#ba1a1a] flex items-center justify-between">
+                <span>{userLoadError}</span>
+                <button
+                  onClick={handleRetry}
+                  className="px-3 py-1 bg-[#ba1a1a] text-white rounded text-xs font-medium cursor-pointer"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-space-md">
+                  {avatar ? (
+                    <img
+                      src={avatar}
+                      alt="Profile Avatar"
+                      className="w-16 h-16 rounded-full object-cover border-2 border-[#e9e8e5] shadow-xs"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-[#37675d] text-[#ffffff] font-semibold text-lg flex items-center justify-center border-2 border-[#e9e8e5] shadow-xs select-none tracking-wider">
+                      {getUserInitials(name, email)}
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <span className="font-headline-sm text-sm font-semibold text-[#1b1c1a] block">
+                      Auditor Avatar
+                    </span>
+                    <span className="text-xs text-[#75777a] block">
+                      Managed via team authentication profile.
+                    </span>
+                  </div>
+                </div>
 
-            <div className="space-y-1">
-              <label className="font-label-caps text-[10px] text-[#75777a] uppercase font-semibold block">
-                Full Name
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-sans bg-[#f4f3f0] border border-[#e9e8e5] rounded-lg focus:outline-none focus:border-[#37675d]"
-              />
-            </div>
+                <div className="space-y-1">
+                  <label className="font-label-caps text-[10px] text-[#75777a] uppercase font-semibold block">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    disabled={isSaving}
+                    placeholder="Enter your name"
+                    className="w-full px-3 py-2 text-xs font-sans bg-[#f4f3f0] border border-[#e9e8e5] rounded-lg focus:outline-none focus:border-[#37675d]"
+                  />
+                </div>
 
-            <div className="space-y-1">
-              <label className="font-label-caps text-[10px] text-[#75777a] uppercase font-semibold block">
-                Email Address
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-sans bg-[#f4f3f0] border border-[#e9e8e5] rounded-lg focus:outline-none focus:border-[#37675d]"
-              />
-            </div>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="font-label-caps text-[10px] text-[#75777a] uppercase font-semibold block">
+                      Email Address
+                    </label>
+                    <span className="text-[10px] text-[#75777a]">Read-only</span>
+                  </div>
+                  <input
+                    type="email"
+                    value={email}
+                    readOnly
+                    title="Account email address is read-only"
+                    className="w-full px-3 py-2 text-xs font-sans bg-[#efeeeb] text-[#44474a] border border-[#e9e8e5] rounded-lg cursor-not-allowed select-none"
+                  />
+                  <p className="text-[10px] text-[#75777a]">
+                    Authenticated workspace email is managed via your identity session.
+                  </p>
+                </div>
 
-            <div className="space-y-1">
-              <label className="font-label-caps text-[10px] text-[#75777a] uppercase font-semibold block">
-                Protocol Role
-              </label>
-              <input
-                type="text"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-sans bg-[#f4f3f0] border border-[#e9e8e5] rounded-lg focus:outline-none focus:border-[#37675d]"
-              />
-            </div>
+                <div className="space-y-1">
+                  <label className="font-label-caps text-[10px] text-[#75777a] uppercase font-semibold block">
+                    Protocol Role
+                  </label>
+                  <input
+                    type="text"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    disabled={isSaving}
+                    placeholder="e.g. Lead Protocol Auditor"
+                    className="w-full px-3 py-2 text-xs font-sans bg-[#f4f3f0] border border-[#e9e8e5] rounded-lg focus:outline-none focus:border-[#37675d]"
+                  />
+                </div>
 
-            <div className="pt-space-xs">
-              <button
-                onClick={handleSavePersonal}
-                className="px-space-md py-2 bg-[#000000] hover:bg-[#191c1f] text-white rounded-lg text-xs font-semibold transition-all shadow-xs cursor-pointer active:scale-95"
-              >
-                Save Changes
-              </button>
-            </div>
+                <div className="pt-space-xs">
+                  <button
+                    onClick={handleSavePersonal}
+                    disabled={isSaving}
+                    className="px-space-md py-2 bg-[#000000] hover:bg-[#191c1f] text-white rounded-lg text-xs font-semibold transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {isSaving && (
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    )}
+                    <span>{isSaving ? 'Saving Changes...' : 'Save Changes'}</span>
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
 

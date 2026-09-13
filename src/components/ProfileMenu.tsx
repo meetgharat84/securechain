@@ -1,6 +1,5 @@
 import React, { useRef, useEffect } from 'react';
 import type { AppScreen } from '../types';
-import { AVATAR_URL } from '../data/mockData';
 import { AuthService } from '../services/authService';
 
 interface ProfileMenuProps {
@@ -10,23 +9,40 @@ interface ProfileMenuProps {
   onOpenCommandPalette: () => void;
   userName?: string;
   userEmail?: string;
+  userAvatar?: string;
   workspaceName?: string;
 }
+
+const getUserInitials = (name?: string, email?: string): string => {
+  if (name && name.trim()) {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return parts[0].substring(0, 2).toUpperCase();
+  }
+  if (email && email.trim()) {
+    return email.trim().substring(0, 2).toUpperCase();
+  }
+  return 'U';
+};
 
 export const ProfileMenu: React.FC<ProfileMenuProps> = ({
   isOpen,
   onClose,
   onNavigate,
   onOpenCommandPalette,
-  userName = 'Lead Protocol Auditor',
-  userEmail = 'sec@securechain.ai',
+  userName = 'Auditor',
+  userEmail = '',
+  userAvatar,
   workspaceName = 'Treasury Protocols',
 }) => {
   const menuRef = useRef<HTMLDivElement | null>(null);
 
+  // Close menu on click outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         onClose();
       }
     };
@@ -48,11 +64,17 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
       {/* User Header */}
       <div className="p-space-md border-b border-[#e9e8e5] bg-[#f4f3f0] space-y-1">
         <div className="flex items-center gap-2">
-          <img
-            src={AVATAR_URL}
-            alt="Profile Avatar"
-            className="w-9 h-9 rounded-full object-cover border border-[#c5c6ca]"
-          />
+          {userAvatar ? (
+            <img
+              src={userAvatar}
+              alt="Profile Avatar"
+              className="w-9 h-9 rounded-full object-cover border border-[#c5c6ca]"
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-[#37675d] text-[#ffffff] font-semibold text-xs flex items-center justify-center border border-[#c5c6ca] shrink-0 select-none">
+              {getUserInitials(userName, userEmail)}
+            </div>
+          )}
           <div className="flex flex-col truncate">
             <span className="font-headline-sm text-xs font-semibold text-[#1b1c1a] truncate">
               {userName}

@@ -4,11 +4,12 @@ import type { UserDoc, WorkspaceDoc, AnalysisDoc, PatchDoc, VerificationRunDoc }
 import { DeterministicSecurityEngine } from '../services/securityEngine';
 import { AIService } from '../services/aiService';
 import { CompilerAndVerifierService } from '../services/compilerAndVerifier';
+import { AuthService, DEMO_MODE } from '../services/authService';
 
 // Request Validation Schemas
 export const UpdateProfileSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
-  email: z.string().email('Invalid email address'),
+  email: z.string().email('Invalid email address').optional(),
   role: z.string().optional(),
 });
 
@@ -36,12 +37,19 @@ export const StartAnalysisSchema = z.object({
 
 export class ApiService {
   /**
-   * Get currently logged-in user
+   * Get currently logged-in user from authenticated session
    */
   public static async getCurrentUser(): Promise<UserDoc> {
-    const user = Array.from(db.users.values())[0];
-    if (!user) throw new Error('User not found');
-    return user;
+    const authUser = AuthService.getCurrentUser();
+    if (authUser) {
+      const fromDb = db.users.get(authUser._id);
+      return fromDb || authUser;
+    }
+    if (DEMO_MODE) {
+      const user = Array.from(db.users.values())[0];
+      if (user) return user;
+    }
+    throw new Error('Unauthenticated: No active user session found.');
   }
 
   /**
@@ -52,12 +60,13 @@ export class ApiService {
     const user = await this.getCurrentUser();
     const updated: UserDoc = {
       ...user,
-      name: valid.name,
-      email: valid.email,
-      role: valid.role || user.role,
+      name: valid.name.trim(),
+      email: user.email, // email is strictly preserved from authenticated account
+      role: valid.role !== undefined ? valid.role : user.role,
       updatedAt: new Date().toISOString(),
     };
     db.saveUser(updated);
+    AuthService.updateCurrentUser(updated);
     return updated;
   }
 

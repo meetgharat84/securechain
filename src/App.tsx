@@ -23,6 +23,8 @@ import { Sidebar } from './components/Sidebar';
 import { CommandPalette } from './components/CommandPalette';
 import { Toast } from './components/Toast';
 import { LoginView } from './components/LoginView';
+import type { UserDoc } from './server/models';
+import { AuthService } from './services/authService';
 
 const getInitialScreen = (): { screen: AppScreen; findingId?: string } => {
   if (typeof window === 'undefined') return { screen: 'landing' };
@@ -32,6 +34,17 @@ const getInitialScreen = (): { screen: AppScreen; findingId?: string } => {
   if (path === '/register' || path === '/register/') return { screen: 'register' };
   if (path === '/how-it-works' || path === '/methodology') return { screen: 'methodology' };
   if (path === '/gallery' || path === '/demo-gallery') return { screen: 'demo-gallery' };
+
+  // Route protection for console screens: if unauthenticated, redirect to /login
+  if (!AuthService.isAuthenticated()) {
+    if (path.startsWith('/app')) {
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.history.replaceState({}, '', '/login');
+      }
+      return { screen: 'login' };
+    }
+  }
+
   if (path === '/app' || path === '/app/') return { screen: 'overview' };
   if (path.startsWith('/app/analyze') && path.includes('/progress')) return { screen: 'scan-progress' };
   if (path.startsWith('/app/analyze')) return { screen: 'new-analysis' };
@@ -58,6 +71,9 @@ export function App() {
   const [isNewScanModalOpen, setIsNewScanModalOpen] = useState<boolean>(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserDoc | null>(() => AuthService.getCurrentUser());
+
+  const isConsoleScreen = currentScreen !== 'landing' && currentScreen !== 'login' && currentScreen !== 'register';
 
   // Active Contract and Findings State
   const [activeContractName, setActiveContractName] = useState<string>('VulnerableVault.sol');
@@ -90,6 +106,17 @@ export function App() {
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
+
+  // Keep currentUser synchronized with auth state & redirect on logout
+  useEffect(() => {
+    const unsubscribe = AuthService.subscribe((state) => {
+      setCurrentUser(state.user);
+      if (!state.isAuthenticated && isConsoleScreen) {
+        navigateTo('login', '/login');
+      }
+    });
+    return unsubscribe;
+  }, [navigateTo, isConsoleScreen]);
 
   // Handle browser back/forward buttons
   useEffect(() => {
@@ -166,7 +193,6 @@ export function App() {
     setToastMessage(`Analysis completed: ${currentFindings.length} vulnerabilities found.`);
   };
 
-  const isConsoleScreen = currentScreen !== 'landing' && currentScreen !== 'login' && currentScreen !== 'register';
 
   return (
     <div className="min-h-screen bg-[#faf9f6] text-[#1b1c1a] flex flex-col font-sans selection:bg-[#37675d]/20 selection:text-[#1b1c1a]">
@@ -217,6 +243,7 @@ export function App() {
             activeTarget={activeTarget}
             onSelectTarget={setActiveTarget}
             onOpenNewScan={() => setIsNewScanModalOpen(true)}
+            currentUser={currentUser}
           />
 
           {/* Right Content Area */}
@@ -229,6 +256,7 @@ export function App() {
               onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
               onOpenNewScan={() => setIsNewScanModalOpen(true)}
               onNavigate={navigateTo}
+              currentUser={currentUser}
             />
 
             {/* Main View Router */}
@@ -321,6 +349,8 @@ export function App() {
                 <ProfileView
                   onNavigate={navigateTo}
                   onShowToast={setToastMessage}
+                  currentUser={currentUser}
+                  onUserUpdated={setCurrentUser}
                 />
               )}
 
