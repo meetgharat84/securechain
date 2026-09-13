@@ -1,5 +1,7 @@
 export type AppScreen = 
   | 'landing'
+  | 'login'
+  | 'register'
   | 'overview'
   | 'patch-review'
   | 'attack-replay'

@@ -1,11 +1,12 @@
 import React, { useRef, useEffect } from 'react';
 import type { AppScreen } from '../types';
 import { AVATAR_URL } from '../data/mockData';
+import { AuthService } from '../services/authService';
 
 interface ProfileMenuProps {
   isOpen: boolean;
   onClose: () => void;
-  onNavigate: (screen: AppScreen) => void;
+  onNavigate: (screen: AppScreen, urlPath?: string) => void;
   onOpenCommandPalette: () => void;
   userName?: string;
   userEmail?: string;
@@ -137,8 +138,8 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
           <button
             onClick={() => {
               onClose();
-              alert('Signed out of SecureChain AI audit session.');
-              onNavigate('landing');
+              AuthService.logout();
+              onNavigate('login', '/login');
             }}
             className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg hover:bg-[#ffdad6]/40 text-[#ba1a1a] text-left transition-colors cursor-pointer"
           >

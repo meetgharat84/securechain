@@ -22,11 +22,14 @@ import { ConsoleHeader } from './components/ConsoleHeader';
 import { Sidebar } from './components/Sidebar';
 import { CommandPalette } from './components/CommandPalette';
 import { Toast } from './components/Toast';
+import { LoginView } from './components/LoginView';
 
 const getInitialScreen = (): { screen: AppScreen; findingId?: string } => {
   if (typeof window === 'undefined') return { screen: 'landing' };
   const path = window.location.pathname;
   if (path === '/' || path === '') return { screen: 'landing' };
+  if (path === '/login' || path === '/login/') return { screen: 'login' };
+  if (path === '/register' || path === '/register/') return { screen: 'register' };
   if (path === '/how-it-works' || path === '/methodology') return { screen: 'methodology' };
   if (path === '/gallery' || path === '/demo-gallery') return { screen: 'demo-gallery' };
   if (path === '/app' || path === '/app/') return { screen: 'overview' };
@@ -66,6 +69,8 @@ export function App() {
     setCurrentScreen(screen);
     const targetUrl = urlPath || (
       screen === 'landing' ? '/' :
+      screen === 'login' ? '/login' :
+      screen === 'register' ? '/register' :
       screen === 'overview' ? '/app' :
       screen === 'new-analysis' ? '/app/analyze' :
       screen === 'scan-progress' ? '/app/analyze/active/progress' :
@@ -161,7 +166,7 @@ export function App() {
     setToastMessage(`Analysis completed: ${currentFindings.length} vulnerabilities found.`);
   };
 
-  const isConsoleScreen = currentScreen !== 'landing';
+  const isConsoleScreen = currentScreen !== 'landing' && currentScreen !== 'login' && currentScreen !== 'register';
 
   return (
     <div className="min-h-screen bg-[#faf9f6] text-[#1b1c1a] flex flex-col font-sans selection:bg-[#37675d]/20 selection:text-[#1b1c1a]">
@@ -189,6 +194,16 @@ export function App() {
           onNavigate={navigateTo}
           onOpenNewScan={() => setIsNewScanModalOpen(true)}
           onSelectFindingForWorkbench={() => setSelectedFindingId('f-1')}
+        />
+      )}
+
+      {/* AUTHENTICATION PAGES (/login, /register) */}
+      {(currentScreen === 'login' || currentScreen === 'register') && (
+        <LoginView
+          key={currentScreen}
+          initialMode={currentScreen === 'register' ? 'register' : 'login'}
+          onNavigate={navigateTo}
+          onShowToast={setToastMessage}
         />
       )}
 

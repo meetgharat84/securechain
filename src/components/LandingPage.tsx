@@ -2,9 +2,10 @@ import React from 'react';
 import type { AppScreen } from '../types';
 import { SHIELD_LOGO_URL, AVATAR_URL } from '../data/mockData';
 import { SecureChainFrameAnimation } from './SecureChainFrameAnimation';
+import { AuthService } from '../services/authService';
 
 interface LandingPageProps {
-  onNavigate: (screen: AppScreen) => void;
+  onNavigate: (screen: AppScreen, urlPath?: string) => void;
   onOpenNewScan: () => void;
   onSelectFindingForWorkbench?: () => void;
 }
@@ -88,7 +89,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             <button
-              onClick={() => onNavigate('overview')}
+              onClick={() => {
+                if (AuthService.isAuthenticated()) {
+                  onNavigate('overview', '/app');
+                } else {
+                  onNavigate('login', '/login');
+                }
+              }}
               className="px-space-md py-space-xs bg-[#000000] text-[#ffffff] rounded-lg font-headline-sm text-body-base hover:bg-[#191c1f] transition-all shadow-xs cursor-pointer active:scale-95"
             >
               Open Console
@@ -564,7 +571,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 {/* Final Restrained Graphite Actions */}
                 <div className="pt-4 flex flex-wrap items-center justify-center gap-4">
                   <button
-                    onClick={() => onNavigate('overview')}
+                    onClick={() => {
+                      if (AuthService.isAuthenticated()) {
+                        onNavigate('overview', '/app');
+                      } else {
+                        onNavigate('login', '/login');
+                      }
+                    }}
                     className="inline-flex items-center gap-2 px-8 py-3 rounded-full bg-[#000000] text-[#ffffff] hover:bg-[#191c1f] transition-all text-sm font-semibold tracking-tight shadow-md hover:shadow-lg cursor-pointer active:scale-95"
                   >
                     <span>Analyze a Contract Now</span>
